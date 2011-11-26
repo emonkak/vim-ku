@@ -47,11 +47,13 @@ function! ku#buffer#on_source_enter(source_name_ext)  "{{{2
     if bufexists(i) && buflisted(i)
       let bufname = bufname(i)
       call add(_, {
-      \      'word': bufname,
+      \      'word': bufname != '' ? bufname
+      \            : printf('[No Name] [%s]', getbufline(i, 1)[0]),
       \      'menu': printf('buffer %*d', len(bufnr('$')), i),
       \      'dup': 1,
       \      'ku_buffer_nr': i,
       \      'ku__sort_priority': bufname ==# fnamemodify(bufname, ':p')
+      \                           || bufname == ''
       \    })
     endif
   endfor
