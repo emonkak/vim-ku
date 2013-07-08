@@ -48,9 +48,8 @@ function! ku#buffer#on_source_enter(source_name_ext)  "{{{2
       let bufname = bufname(i)
       call add(_, {
       \      'word': bufname != '' ? bufname
-      \            : printf('[No Name] [%s]', getbufline(i, 1)[0]),
+      \            : printf('%d: %s', i, s:first_line(i)),
       \      'menu': printf('buffer %*d', len(bufnr('$')), i),
-      \      'dup': 1,
       \      'ku_buffer_nr': i,
       \      'ku__sort_priority': bufname ==# fnamemodify(bufname, ':p')
       \                           || bufname == ''
@@ -129,6 +128,23 @@ function! s:delete(delete_command, item)  "{{{2
   else
     return 'No such buffer: ' . string(a:item.word)
   endif
+endfunction
+
+
+
+
+function! s:first_line(bufnr)  "{{{2
+  let i = 1
+
+  while 1
+    let line = getbufline(a:bufnr, i)
+    if empty(line) || line[0] != ''
+      break
+    endif
+    let i += 1
+  endwhile
+
+  return get(line, 0, '[No Name]')
 endfunction
 
 
