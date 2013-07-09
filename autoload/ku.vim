@@ -795,7 +795,7 @@ if has('lua')
     -- Assumption: len(a:a) == len(a:b)
     for i = 0, #a - 1 do
       if a[i] ~= b[i] then
-        return a[i] > b[i]
+        return a[i] < b[i]
       end
     end
     return false
