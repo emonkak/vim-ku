@@ -856,7 +856,7 @@ function! s:_omnifunc_core(current_source, pattern, items)  "{{{
   local items = {}
   for _ in vim.eval('a:items')() do
     if 1 == i or _.word:sub(0, i - 1) == prefix then
-      _.ku__completed_p = 1
+      _.ku__completed_p = '1'  -- Avoid float casting
       _.ku__usource = current_source
 
       local word
