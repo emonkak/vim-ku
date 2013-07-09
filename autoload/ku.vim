@@ -814,7 +814,7 @@ function! s:_omnifunc_core(current_source, pattern, items)  "{{{
   -- Prefix assumption - By automatic component completion, it's hard to insert
   -- text with uncompleted "prefix", so that "prefix" is excluded to match.
   local i = pattern:find(regexp_not_any_char_of(vim.eval('g:ku_component_separators')) .. '*$')
-  local prefix = (i == 1) and '' or string.sub(pattern, 0, i - 1)
+  local prefix = (i == 1) and '' or pattern:sub(0, i - 1)
   pattern = pattern:sub(i)
   local empty_pattern_p = pattern == ''
 
