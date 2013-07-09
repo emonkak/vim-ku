@@ -931,7 +931,7 @@ function! s:_omnifunc_core(current_source, pattern, items)  "{{{
     result:add(item)
   end
 
-  if vim.eval("exists('g:ku_debug_p') && g:ku_debug_p") then
+  if vim.eval("exists('g:ku_debug_p') && g:ku_debug_p") == 1 then
     print('pattern:', pattern)
     print('asis:', asis_regexp)
     print('word:', word_regexp)
