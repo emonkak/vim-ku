@@ -845,12 +845,12 @@ function! s:_omnifunc_core(current_source, pattern, items)  "{{{
     word_c_ms = 0
   end
 
-  local common_junk_pattern = vim.eval('g:ku_common_junk_pattern')
-  local source_junk_pattern = vim.eval([[
-    exists("g:ku_{a:current_source}_junk_pattern")
-      ? g:ku_{a:current_source}_junk_pattern
-      : 0
-  ]])
+  local common_junk_pattern = vim.eval(
+    'get(g:, "ku_common_junk_pattern_for_lua", "")'
+  )
+  local source_junk_pattern = vim.eval(
+    'get(g:, "ku_" . a:current_source . "_junk_pattern_for_lua", "")'
+  )
   local re_acc_sep = regexp_any_char_of(vim.eval('g:ku_component_separators'))
 
   local items = {}
@@ -866,9 +866,6 @@ function! s:_omnifunc_core(current_source, pattern, items)  "{{{
         asis_C_ms = _.word:sub(i):gsub(re_acc_sep, '%0 ')
         word = 0
       else
-        local _word = _.word
-        local _upper_word = _word:upper()
-
         -- Skip many match()/matchend() callings by the following conditions:
         -- (a) If match() is failed for a pattern,
         --     it's not necessary to call matchend() for that pattern.
@@ -879,13 +876,14 @@ function! s:_omnifunc_core(current_source, pattern, items)  "{{{
         --     If a "word" pattern is not matched,
         --     the corresponding "asis" pattern is not also matched.
           -- Cases (c), (a)
-        skip_c_ms, skip_c_me =               _upper_word:find(upper_skip_regexp, i)
-        word_c_ms, word_c_me = skip_c_ms and _upper_word:find(upper_word_regexp, i)
-        asis_c_ms            = word_c_ms and _upper_word:find(upper_asis_regexp, i)
+        local upper_word = _.word:upper()
+        skip_c_ms, skip_c_me =               upper_word:find(upper_skip_regexp, i)
+        word_c_ms, word_c_me = skip_c_ms and upper_word:find(upper_word_regexp, i)
+        asis_c_ms            = word_c_ms and upper_word:find(upper_asis_regexp, i)
           -- Cases (b), (a)
-        skip_C_ms, skip_C_me = skip_c_ms and _word:find(skip_regexp, i)
-        word_C_ms, word_C_me = word_c_ms and _word:find(word_regexp, i)
-        asis_C_ms            = asis_c_ms and _word:find(asis_regexp, i)
+        skip_C_ms, skip_C_me = skip_c_ms and _.word:find(skip_regexp, i)
+        word_C_ms, word_C_me = word_c_ms and _.word:find(word_regexp, i)
+        asis_C_ms            = asis_c_ms and _.word:find(asis_regexp, i)
 
         asis_C_ms = asis_C_ms or INFINITY
         asis_c_ms = asis_c_ms or INFINITY
@@ -899,8 +897,8 @@ function! s:_omnifunc_core(current_source, pattern, items)  "{{{
 
       local sort_priorities = vim.list()
       sort_priorities:add(_.ku__sort_priority or 0)
-      sort_priorities:add(0)  -- TODO: g:ku_common_junk_pattern
-      sort_priorities:add(0)  -- TODO: g:ku_{a:current_source}_junk_pattern
+      sort_priorities:add(_.word:find(common_junk_pattern) ~= nil)
+      sort_priorities:add(_.word:find(source_junk_pattern) ~= nil)
       sort_priorities:add(asis_C_ms)
       sort_priorities:add(asis_c_ms)
       sort_priorities:add(word_C_ms)
