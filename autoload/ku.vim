@@ -785,6 +785,21 @@ if has('lua')
     s = s:gsub('%s+', ''):gsub('[^A-Za-z\\ ]', '%%%0')
     return s:sub(0, -2):gsub('.', '%0.-') .. s:sub(-1, -1)
   end
+
+  function _omnifunc_compare_items(a, b)
+    return omnifunc_compare_lists(a.ku__sort_priorities,
+                                  b.ku__sort_priorities)
+  end
+
+  function omnifunc_compare_lists(a, b)
+    -- Assumption: len(a:a) == len(a:b)
+    for i = 0, #a - 1 do
+      if a[i] ~= b[i] then
+        return a[i] > b[i]
+      end
+    end
+    return false
+  end
 EOF
 
 function! s:_omnifunc_core(current_source, pattern, items)  "{{{
@@ -838,7 +853,7 @@ function! s:_omnifunc_core(current_source, pattern, items)  "{{{
   ]])
   local re_acc_sep = regexp_any_char_of(vim.eval('g:ku_component_separators'))
 
-  local result = vim.eval('result')
+  local items = {}
   for _ in vim.eval('a:items')() do
     if 1 == i or _.word:sub(0, i - 1) == prefix then
       _.ku__completed_p = 1
@@ -904,9 +919,16 @@ function! s:_omnifunc_core(current_source, pattern, items)  "{{{
       -- BUGS: Don't forget to update the index for the matched position of
       --       case-insensitive skip_regexp.
       if nil ~= skip_c_ms then
-        result:add(_)
+        table.insert(items, _)
       end
     end
+  end
+
+  table.sort(items, _omnifunc_compare_items)
+
+  result = vim.eval('result')
+  for i, item in ipairs(items) do
+    result:add(item)
   end
 EOF
 
