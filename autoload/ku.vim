@@ -766,15 +766,15 @@ endfunction
 if has('lua')
   lua << EOF
   function regexp_any_char_of(cs)
-    return '[' .. string.gsub(cs, '%[', '%%%0') .. ']'
+    return '[' .. cs:gsub('%[%%', '%%%0') .. ']'
   end
 
   function regexp_not_any_char_of(cs)
-    return '[^' .. string.gsub(cs, '%[', '%%%0') .. ']'
+    return '[^' .. cs:gsub('%[%%', '%%%0') .. ']'
   end
 
   function make_asis_regexp(s)
-    return s:gsub('[^A-Za-z\\ ]', '%%%0')
+    return s:gsub('%W', '%%%0')
   end
 
   function make_word_regexp(s)
@@ -782,8 +782,8 @@ if has('lua')
   end
 
   function make_skip_regexp(s)
-    s = s:gsub('%s+', ''):gsub('[^A-Za-z\\ ]', '%%%0')
-    return s:sub(0, -2):gsub('.', '%0.-') .. s:sub(-1, -1)
+    s = s:gsub('%s+', ''):gsub('%W', '%%%0')
+    return s:sub(0, -2):gsub('[^%%]', '%0.-') .. s:sub(-1, -1)
   end
 
   function _omnifunc_compare_items(a, b)
@@ -929,6 +929,20 @@ function! s:_omnifunc_core(current_source, pattern, items)  "{{{
   result = vim.eval('result')
   for i, item in ipairs(items) do
     result:add(item)
+  end
+
+  if vim.eval("exists('g:ku_debug_p') && g:ku_debug_p") then
+    print('pattern:', pattern)
+    print('asis:', asis_regexp)
+    print('word:', word_regexp)
+    print('skip:', skip_regexp)
+    for i, item in ipairs(items) do
+      local sort_priorities = '|'
+      for priority in item.ku__sort_priorities() do
+        sort_priorities = sort_priorities .. priority .. '|'
+      end
+      print(sort_priorities)
+    end
   end
 EOF
 
