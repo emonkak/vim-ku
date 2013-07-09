@@ -932,7 +932,6 @@ function! s:_omnifunc_core(current_source, pattern, items)  "{{{
   end
 EOF
 
-  call sort(result, function('s:_omnifunc_compare_items'))
   return result
 endfunction  "}}}
 endif
