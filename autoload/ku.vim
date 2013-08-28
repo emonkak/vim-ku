@@ -762,8 +762,7 @@ endfunction
 
 
 " For Lua Interface  "{{{3
-
-if has('lua')
+function s:_define_lua_functions()  "{{{
   lua << EOF
   function regexp_any_char_of(cs)
     return '[' .. cs:gsub('%[%%', '%%%0') .. ']'
@@ -801,151 +800,154 @@ if has('lua')
     return false
   end
 EOF
+endfunction  "}}}
 
-function! s:_omnifunc_core(current_source, pattern, items)  "{{{
-  let result = []
+if has('lua')
+  call s:_define_lua_functions()
+  function! s:_omnifunc_core(current_source, pattern, items)  "{{{
+    let result = []
 
-  lua << EOF
-  -- NB: This function doesn't know about the cache.
-  local INFINITY = 2147483647  -- to easily sort by ku__sort_priorities.
-  local current_source = vim.eval('a:current_source')
-  local pattern = vim.eval('a:pattern')
+    lua << EOF
+    -- NB: This function doesn't know about the cache.
+    local INFINITY = 2147483647  -- to easily sort by ku__sort_priorities.
+    local current_source = vim.eval('a:current_source')
+    local pattern = vim.eval('a:pattern')
 
-  -- Prefix assumption - By automatic component completion, it's hard to insert
-  -- text with uncompleted "prefix", so that "prefix" is excluded to match.
-  local i = pattern:find(regexp_not_any_char_of(vim.eval('g:ku_component_separators')) .. '*$')
-  local prefix = (i == 1) and '' or pattern:sub(0, i - 1)
-  pattern = pattern:sub(i)
-  local empty_pattern_p = pattern == ''
+    -- Prefix assumption - By automatic component completion, it's hard to insert
+    -- text with uncompleted "prefix", so that "prefix" is excluded to match.
+    local i = pattern:find(regexp_not_any_char_of(vim.eval('g:ku_component_separators')) .. '*$')
+    local prefix = (i == 1) and '' or pattern:sub(0, i - 1)
+    pattern = pattern:sub(i)
+    local empty_pattern_p = pattern == ''
 
-  local asis_regexp = make_asis_regexp(pattern)
-  local word_regexp = make_word_regexp(pattern)
-  local skip_regexp = make_skip_regexp(pattern)
+    local asis_regexp = make_asis_regexp(pattern)
+    local word_regexp = make_word_regexp(pattern)
+    local skip_regexp = make_skip_regexp(pattern)
 
-  local upper_pattern = pattern:upper()
-  local upper_asis_regexp = make_asis_regexp(upper_pattern)
-  local upper_word_regexp = make_word_regexp(upper_pattern)
-  local upper_skip_regexp = make_skip_regexp(upper_pattern)
+    local upper_pattern = pattern:upper()
+    local upper_asis_regexp = make_asis_regexp(upper_pattern)
+    local upper_word_regexp = make_word_regexp(upper_pattern)
+    local upper_skip_regexp = make_skip_regexp(upper_pattern)
 
-  local asis_C_ms, asis_c_ms,
-        skip_C_me, skip_C_ms, skip_c_me, skip_c_ms,
-        word_C_me , word_C_ms , word_c_me , word_c_ms
-  if empty_pattern_p then
-    -- Dummy values for ku__sort_priorities,
-    -- because match()/matchend() are skipped for empty "pattern" for speed-up.
-    asis_C_ms = 0
-    asis_c_ms = 0
-    skip_C_me = 0
-    skip_C_ms = 0
-    skip_c_me = 0
-    skip_c_ms = 0
-    word_C_me = 0
-    word_C_ms = 0
-    word_c_me = 0
-    word_c_ms = 0
-  end
+    local asis_C_ms, asis_c_ms,
+          skip_C_me, skip_C_ms, skip_c_me, skip_c_ms,
+          word_C_me , word_C_ms , word_c_me , word_c_ms
+    if empty_pattern_p then
+      -- Dummy values for ku__sort_priorities,
+      -- because match()/matchend() are skipped for empty "pattern" for speed-up.
+      asis_C_ms = 0
+      asis_c_ms = 0
+      skip_C_me = 0
+      skip_C_ms = 0
+      skip_c_me = 0
+      skip_c_ms = 0
+      word_C_me = 0
+      word_C_ms = 0
+      word_c_me = 0
+      word_c_ms = 0
+    end
 
-  local common_junk_pattern = vim.eval(
-    'get(g:, "ku_common_junk_pattern_for_lua", "")'
-  )
-  local source_junk_pattern = vim.eval(
-    'get(g:, "ku_" . a:current_source . "_junk_pattern_for_lua", "")'
-  )
-  local re_acc_sep = regexp_any_char_of(vim.eval('g:ku_component_separators'))
+    local common_junk_pattern = vim.eval(
+      'get(g:, "ku_common_junk_pattern_for_lua", "")'
+    )
+    local source_junk_pattern = vim.eval(
+      'get(g:, "ku_" . a:current_source . "_junk_pattern_for_lua", "")'
+    )
+    local re_acc_sep = regexp_any_char_of(vim.eval('g:ku_component_separators'))
 
-  local items = {}
-  for _ in vim.eval('a:items')() do
-    if 1 == i or _.word:sub(0, i - 1) == prefix then
-      _.ku__completed_p = '1'  -- Avoid float casting
-      _.ku__usource = current_source
+    local items = {}
+    for _ in vim.eval('a:items')() do
+      if 1 == i or _.word:sub(0, i - 1) == prefix then
+        _.ku__completed_p = '1'  -- Avoid float casting
+        _.ku__usource = current_source
 
-      local word
-      if empty_pattern_p then
-        -- To skip unnecessary checkings in s:_omnifunc_compare_lists(),
-        -- use the unique part of _.word which is matched to patterns.
-        asis_C_ms = _.word:sub(i):gsub(re_acc_sep, '%0 ')
-        word = 0
-      else
-        -- Skip many match()/matchend() callings by the following conditions:
-        -- (a) If match() is failed for a pattern,
-        --     it's not necessary to call matchend() for that pattern.
-        -- (b) If a case-insensitive pattern is not matched,
-        --     the corresponding case-sensitive pattern is not also matched.
-        -- (c) If a "skip" pattern is not matched,
-        --     the corresponding "word" pattern is not also matched.
-        --     If a "word" pattern is not matched,
-        --     the corresponding "asis" pattern is not also matched.
-          -- Cases (c), (a)
-        local upper_word = _.word:upper()
-        skip_c_ms, skip_c_me =               upper_word:find(upper_skip_regexp, i)
-        word_c_ms, word_c_me = skip_c_ms and upper_word:find(upper_word_regexp, i)
-        asis_c_ms            = word_c_ms and upper_word:find(upper_asis_regexp, i)
-          -- Cases (b), (a)
-        skip_C_ms, skip_C_me = skip_c_ms and _.word:find(skip_regexp, i)
-        word_C_ms, word_C_me = word_c_ms and _.word:find(word_regexp, i)
-        asis_C_ms            = asis_c_ms and _.word:find(asis_regexp, i)
+        local word
+        if empty_pattern_p then
+          -- To skip unnecessary checkings in s:_omnifunc_compare_lists(),
+          -- use the unique part of _.word which is matched to patterns.
+          asis_C_ms = _.word:sub(i):gsub(re_acc_sep, '%0 ')
+          word = 0
+        else
+          -- Skip many match()/matchend() callings by the following conditions:
+          -- (a) If match() is failed for a pattern,
+          --     it's not necessary to call matchend() for that pattern.
+          -- (b) If a case-insensitive pattern is not matched,
+          --     the corresponding case-sensitive pattern is not also matched.
+          -- (c) If a "skip" pattern is not matched,
+          --     the corresponding "word" pattern is not also matched.
+          --     If a "word" pattern is not matched,
+          --     the corresponding "asis" pattern is not also matched.
+            -- Cases (c), (a)
+          local upper_word = _.word:upper()
+          skip_c_ms, skip_c_me =               upper_word:find(upper_skip_regexp, i)
+          word_c_ms, word_c_me = skip_c_ms and upper_word:find(upper_word_regexp, i)
+          asis_c_ms            = word_c_ms and upper_word:find(upper_asis_regexp, i)
+            -- Cases (b), (a)
+          skip_C_ms, skip_C_me = skip_c_ms and _.word:find(skip_regexp, i)
+          word_C_ms, word_C_me = word_c_ms and _.word:find(word_regexp, i)
+          asis_C_ms            = asis_c_ms and _.word:find(asis_regexp, i)
 
-        asis_C_ms = asis_C_ms or INFINITY
-        asis_c_ms = asis_c_ms or INFINITY
-        word_C_me = word_C_me or INFINITY
-        word_C_ms = word_C_ms or INFINITY
-        word_c_me = word_c_me or INFINITY
-        word_c_ms = word_c_ms or INFINITY
+          asis_C_ms = asis_C_ms or INFINITY
+          asis_c_ms = asis_c_ms or INFINITY
+          word_C_me = word_C_me or INFINITY
+          word_C_ms = word_C_ms or INFINITY
+          word_c_me = word_c_me or INFINITY
+          word_c_ms = word_c_ms or INFINITY
 
-        word = _.word:sub(i):gsub(re_acc_sep, '%0 ')
-      end
+          word = _.word:sub(i):gsub(re_acc_sep, '%0 ')
+        end
 
-      local sort_priorities = vim.list()
-      sort_priorities:add(_.ku__sort_priority or 0)
-      sort_priorities:add(_.word:find(common_junk_pattern) ~= nil)
-      sort_priorities:add(_.word:find(source_junk_pattern) ~= nil)
-      sort_priorities:add(asis_C_ms)
-      sort_priorities:add(asis_c_ms)
-      sort_priorities:add(word_C_ms)
-      sort_priorities:add(word_C_me)
-      sort_priorities:add(word_c_ms)
-      sort_priorities:add(word_c_me)
-      sort_priorities:add(skip_C_ms)
-      sort_priorities:add(skip_C_me)
-      sort_priorities:add(skip_c_ms)
-      sort_priorities:add(skip_c_me)
-      sort_priorities:add(word)
-      _.ku__sort_priorities = sort_priorities
+        local sort_priorities = vim.list()
+        sort_priorities:add(_.ku__sort_priority or 0)
+        sort_priorities:add(_.word:find(common_junk_pattern) ~= nil)
+        sort_priorities:add(_.word:find(source_junk_pattern) ~= nil)
+        sort_priorities:add(asis_C_ms)
+        sort_priorities:add(asis_c_ms)
+        sort_priorities:add(word_C_ms)
+        sort_priorities:add(word_C_me)
+        sort_priorities:add(word_c_ms)
+        sort_priorities:add(word_c_me)
+        sort_priorities:add(skip_C_ms)
+        sort_priorities:add(skip_C_me)
+        sort_priorities:add(skip_c_ms)
+        sort_priorities:add(skip_c_me)
+        sort_priorities:add(word)
+        _.ku__sort_priorities = sort_priorities
 
-      -- Remove items not matched to case-insensitive skip_regexp, because user
-      -- doesn't want such items to be completed.
-      -- BUGS: Don't forget to update the index for the matched position of
-      --       case-insensitive skip_regexp.
-      if nil ~= skip_c_ms then
-        table.insert(items, _)
+        -- Remove items not matched to case-insensitive skip_regexp, because user
+        -- doesn't want such items to be completed.
+        -- BUGS: Don't forget to update the index for the matched position of
+        --       case-insensitive skip_regexp.
+        if nil ~= skip_c_ms then
+          table.insert(items, _)
+        end
       end
     end
-  end
 
-  table.sort(items, _omnifunc_compare_items)
+    table.sort(items, _omnifunc_compare_items)
 
-  result = vim.eval('result')
-  for i, item in ipairs(items) do
-    result:add(item)
-  end
-
-  if vim.eval("exists('g:ku_debug_p') && g:ku_debug_p") == 1 then
-    print('pattern:', pattern)
-    print('asis:', asis_regexp)
-    print('word:', word_regexp)
-    print('skip:', skip_regexp)
+    result = vim.eval('result')
     for i, item in ipairs(items) do
-      local sort_priorities = '|'
-      for priority in item.ku__sort_priorities() do
-        sort_priorities = sort_priorities .. priority .. '|'
-      end
-      print(sort_priorities)
+      result:add(item)
     end
-  end
+
+    if vim.eval("exists('g:ku_debug_p') && g:ku_debug_p") == 1 then
+      print('pattern:', pattern)
+      print('asis:', asis_regexp)
+      print('word:', word_regexp)
+      print('skip:', skip_regexp)
+      for i, item in ipairs(items) do
+        local sort_priorities = '|'
+        for priority in item.ku__sort_priorities() do
+          sort_priorities = sort_priorities .. priority .. '|'
+        end
+        print(sort_priorities)
+      end
+    end
 EOF
 
-  return result
-endfunction  "}}}
+    return result
+  endfunction  "}}}
 endif
 
 
