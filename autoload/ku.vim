@@ -762,35 +762,37 @@ endfunction
 
 
 " For Lua Interface  "{{{3
-function s:_define_lua_functions()  "{{{
+if has('lua')
   lua << EOF
-  function regexp_any_char_of(cs)
+  ku = {}
+
+  function ku.regexp_any_char_of(cs)
     return '[' .. cs:gsub('%[%%', '%%%0') .. ']'
   end
 
-  function regexp_not_any_char_of(cs)
+  function ku.regexp_not_any_char_of(cs)
     return '[^' .. cs:gsub('%[%%', '%%%0') .. ']'
   end
 
-  function make_asis_regexp(s)
+  function ku.make_asis_regexp(s)
     return s:gsub('%W', '%%%0')
   end
 
-  function make_word_regexp(s)
-    return make_asis_regexp(s):gsub('%s+', '.-')
+  function ku.make_word_regexp(s)
+    return ku.make_asis_regexp(s):gsub('%s+', '.-')
   end
 
-  function make_skip_regexp(s)
+  function ku.make_skip_regexp(s)
     s = s:gsub('%s+', ''):gsub('%W', '%%%0')
     return s:sub(0, -2):gsub('[^%%]', '%0.-') .. s:sub(-1, -1)
   end
 
-  function _omnifunc_compare_items(a, b)
-    return omnifunc_compare_lists(a.ku__sort_priorities,
-                                  b.ku__sort_priorities)
+  function ku._omnifunc_compare_items(a, b)
+    return ku._omnifunc_compare_lists(a.ku__sort_priorities,
+                                     b.ku__sort_priorities)
   end
 
-  function omnifunc_compare_lists(a, b)
+  function ku._omnifunc_compare_lists(a, b)
     -- Assumption: len(a:a) == len(a:b)
     for i = 0, #a - 1 do
       if a[i] ~= b[i] then
@@ -799,35 +801,26 @@ function s:_define_lua_functions()  "{{{
     end
     return false
   end
-EOF
-endfunction  "}}}
 
-if has('lua')
-  call s:_define_lua_functions()
-  function! s:_omnifunc_core(current_source, pattern, items)  "{{{
-    let result = []
-
-    lua << EOF
+  function ku._omnifunc_core(current_source, pattern, items)
     -- NB: This function doesn't know about the cache.
     local INFINITY = 2147483647  -- to easily sort by ku__sort_priorities.
-    local current_source = vim.eval('a:current_source')
-    local pattern = vim.eval('a:pattern')
 
     -- Prefix assumption - By automatic component completion, it's hard to insert
     -- text with uncompleted "prefix", so that "prefix" is excluded to match.
-    local i = pattern:find(regexp_not_any_char_of(vim.eval('g:ku_component_separators')) .. '*$')
+    local i = pattern:find(ku.regexp_not_any_char_of(vim.eval('g:ku_component_separators')) .. '*$')
     local prefix = (i == 1) and '' or pattern:sub(0, i - 1)
     pattern = pattern:sub(i)
     local empty_pattern_p = pattern == ''
 
-    local asis_regexp = make_asis_regexp(pattern)
-    local word_regexp = make_word_regexp(pattern)
-    local skip_regexp = make_skip_regexp(pattern)
+    local asis_regexp = ku.make_asis_regexp(pattern)
+    local word_regexp = ku.make_word_regexp(pattern)
+    local skip_regexp = ku.make_skip_regexp(pattern)
 
     local upper_pattern = pattern:upper()
-    local upper_asis_regexp = make_asis_regexp(upper_pattern)
-    local upper_word_regexp = make_word_regexp(upper_pattern)
-    local upper_skip_regexp = make_skip_regexp(upper_pattern)
+    local upper_asis_regexp = ku.make_asis_regexp(upper_pattern)
+    local upper_word_regexp = ku.make_word_regexp(upper_pattern)
+    local upper_skip_regexp = ku.make_skip_regexp(upper_pattern)
 
     local asis_C_ms, asis_c_ms,
           skip_C_me, skip_C_ms, skip_c_me, skip_c_ms,
@@ -853,13 +846,13 @@ if has('lua')
     local source_junk_pattern = vim.eval(
       'get(g:, "ku_" . a:current_source . "_junk_pattern_for_lua", "")'
     )
-    local re_acc_sep = regexp_any_char_of(vim.eval('g:ku_component_separators'))
+    local re_acc_sep = ku.regexp_any_char_of(vim.eval('g:ku_component_separators'))
 
-    local items = {}
-    for _ in vim.eval('a:items')() do
+    local candidates = {}
+    for _ in items() do
       if 1 == i or _.word:sub(0, i - 1) == prefix then
         _.ku__completed_p = '1'  -- Avoid float casting
-        _.ku__usource = current_source
+        _.ku__source = current_source
 
         local word
         if empty_pattern_p then
@@ -919,17 +912,12 @@ if has('lua')
         -- BUGS: Don't forget to update the index for the matched position of
         --       case-insensitive skip_regexp.
         if nil ~= skip_c_ms then
-          table.insert(items, _)
+          table.insert(candidates, _)
         end
       end
     end
 
-    table.sort(items, _omnifunc_compare_items)
-
-    result = vim.eval('result')
-    for i, item in ipairs(items) do
-      result:add(item)
-    end
+    table.sort(candidates, ku._omnifunc_compare_items)
 
     if vim.eval("exists('g:ku_debug_p') && g:ku_debug_p") == 1 then
       print('pattern:', pattern)
@@ -943,6 +931,25 @@ if has('lua')
         end
         print(sort_priorities)
       end
+    end
+
+    return candidates
+  end
+EOF
+
+  function! s:_omnifunc_core(current_source, pattern, items)  "{{{
+    let result = []
+
+    lua << EOF
+    local candidates = ku._omnifunc_core(
+      vim.eval('a:current_source'),
+      vim.eval('a:pattern'),
+      vim.eval('a:items')
+    )
+
+    local result = vim.eval('result')
+    for i, candidate in ipairs(candidates) do
+      result:add(candidate)
     end
 EOF
 
