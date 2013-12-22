@@ -789,7 +789,7 @@ if has('lua')
 
   function ku._omnifunc_compare_items(a, b)
     return ku._omnifunc_compare_lists(a.ku__sort_priorities,
-                                     b.ku__sort_priorities)
+                                      b.ku__sort_priorities)
   end
 
   function ku._omnifunc_compare_lists(a, b)
