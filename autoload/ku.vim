@@ -784,7 +784,7 @@ if has('lua')
 
   function ku.make_skip_regexp(s)
     s = s:gsub('%s+', ''):gsub('%W', '%%%0')
-    return s:sub(0, -2):gsub('[^%%]', '%0.-') .. s:sub(-1, -1)
+    return s:sub(1, -2):gsub('([^%%])(.?)', '%1.-%2') ..  s:sub(-1, -1)
   end
 
   function ku._omnifunc_compare_items(a, b)
@@ -809,7 +809,7 @@ if has('lua')
     -- Prefix assumption - By automatic component completion, it's hard to insert
     -- text with uncompleted "prefix", so that "prefix" is excluded to match.
     local i = pattern:find(ku.regexp_not_any_char_of(vim.eval('g:ku_component_separators')) .. '*$')
-    local prefix = (i == 1) and '' or pattern:sub(0, i - 1)
+    local prefix = (i == 1) and '' or pattern:sub(1, i - 1)
     pattern = pattern:sub(i)
     local empty_pattern_p = pattern == ''
 
@@ -850,7 +850,7 @@ if has('lua')
 
     local candidates = {}
     for _ in items() do
-      if 1 == i or _.word:sub(0, i - 1) == prefix then
+      if 1 == i or _.word:sub(1, i - 1) == prefix then
         _.ku__completed_p = '1'  -- Avoid float casting
         _.ku__source = current_source
 
