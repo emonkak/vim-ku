@@ -924,9 +924,9 @@ if has('lua')
       print('asis:', asis_regexp)
       print('word:', word_regexp)
       print('skip:', skip_regexp)
-      for i, item in ipairs(items) do
+      for i, candidate in ipairs(candidates) do
         local sort_priorities = '|'
-        for priority in item.ku__sort_priorities() do
+        for priority in candidate.ku__sort_priorities() do
           sort_priorities = sort_priorities .. priority .. '|'
         end
         print(sort_priorities)
