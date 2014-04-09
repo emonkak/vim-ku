@@ -364,7 +364,7 @@ function! s:gather_items_from_directory(_)  "{{{2
 
   let items = []
   for wildcard in wildcards
-    for entry in split(glob(glob_prefix . wildcard), "\n")
+    for entry in split(glob(escape(glob_prefix, '?*[') . wildcard), "\n")
       call add(items, {
       \      'word': entry,
       \      'abbr': entry . (isdirectory(entry) ? ku#path_separator() : ''),
