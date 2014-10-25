@@ -48,7 +48,7 @@ function! ku#buffer#on_source_enter(source_name_ext)  "{{{2
       let bufname = bufname(i)
       call add(_, {
       \      'word': bufname != '' ? bufname
-      \            : printf('%d: %s', i, s:first_line(i)),
+      \            : printf('%d: %s', i, s:buffer_preview(i, '[No Name]')),
       \      'menu': printf('buffer %*d', len(bufnr('$')), i),
       \      'ku_buffer_nr': i,
       \      'ku__sort_priority': bufname ==# fnamemodify(bufname, ':p')
@@ -109,6 +109,23 @@ endfunction
 
 
 " Misc.  "{{{1
+function! s:buffer_preview(bufnr, default)  "{{{2
+  let i = 1
+
+  while 1
+    let lines = getbufline(a:bufnr, i)
+    if empty(lines) || lines[0] != ''
+      break
+    endif
+    let i += 1
+  endwhile
+
+  return get(lines, 0, a:default)
+endfunction
+
+
+
+
 function! s:open(bang, item)  "{{{2
   if a:item.ku__completed_p
     execute a:item.ku_buffer_nr 'buffer'.a:bang
@@ -128,23 +145,6 @@ function! s:delete(delete_command, item)  "{{{2
   else
     return 'No such buffer: ' . string(a:item.word)
   endif
-endfunction
-
-
-
-
-function! s:first_line(bufnr)  "{{{2
-  let i = 1
-
-  while 1
-    let line = getbufline(a:bufnr, i)
-    if empty(line) || line[0] != ''
-      break
-    endif
-    let i += 1
-  endwhile
-
-  return get(line, 0, '[No Name]')
 endfunction
 
 
