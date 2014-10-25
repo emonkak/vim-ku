@@ -784,7 +784,7 @@ if has('lua')
 
   function ku.make_skip_regexp(s)
     s = s:gsub('%s+', ''):gsub('%W', '%%%0')
-    return s:sub(1, -2):gsub('([^%%])(.?)', '%1.-%2') ..  s:sub(-1, -1)
+    return s:sub(1, -2):gsub('[^%%]', '%0.-') ..  s:sub(-1, -1)
   end
 
   function ku._omnifunc_compare_items(a, b)
