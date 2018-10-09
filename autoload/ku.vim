@@ -900,10 +900,10 @@ if has('lua')
         sort_priorities:add(word_C_me)
         sort_priorities:add(word_c_ms)
         sort_priorities:add(word_c_me)
-        sort_priorities:add(skip_C_ms)
-        sort_priorities:add(skip_C_me)
-        sort_priorities:add(skip_c_ms)
-        sort_priorities:add(skip_c_me)
+        if skip_C_ms then sort_priorities:add(skip_C_ms) end
+        if skip_C_me then sort_priorities:add(skip_C_me) end
+        if skip_c_ms then sort_priorities:add(skip_c_ms) end
+        if skip_c_me then sort_priorities:add(skip_c_me) end
         sort_priorities:add(word)
         _.ku__sort_priorities = sort_priorities
 
